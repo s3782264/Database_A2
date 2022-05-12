@@ -30,6 +30,7 @@ public class BPlusTree {
 		// Set the end time
 		endTime = System.currentTimeMillis();
 		// Print info to the console
+		
 		System.out.println("Records Loaded: " );
 		System.out.println("Page Count: " );
 		System.out.println("Time Taken (milliseconds): " + (endTime - startTime));
