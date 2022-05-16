@@ -66,9 +66,15 @@ public class BPlusTree {
 		// Set the end time
 		endTime = System.currentTimeMillis();
 		// Print info to the console
+<<<<<<< HEAD
 		System.out.println("Records Indexed: ");
 		System.out.println("Page Count: " + pageNo);
 		System.out.println("Tree Height: ");
+=======
+		
+		System.out.println("Records Loaded: " );
+		System.out.println("Page Count: " );
+>>>>>>> 2f7abee8f5742f4932c108b60f7fdef028489054
 		System.out.println("Time Taken (milliseconds): " + (endTime - startTime));
 	}
 }
