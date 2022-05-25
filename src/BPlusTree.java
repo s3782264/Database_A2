@@ -17,6 +17,7 @@ public class BPlusTree {
 	private InternalNode root;
 	private int hieght;
 	private int index;
+	long temp;
 
 	public BPlusTree() {
 
@@ -71,14 +72,22 @@ public class BPlusTree {
 						// skip NULL birth dates
 						continue;
 					}
-					Date birthDate = new Date(ByteBuffer.wrap(birthDateBytes).getLong());
+					Date birthDate = new Date(birthDateLong);
+		
 					String name = new String(personNameBytes).trim();
-					insert(index, birthDate);
+					
+					int indexKey = (int) birthDateLong;
+					Date date1 = new Date(indexKey);
+					insert(birthDateLong, name);
+					
+					temp = birthDateLong;
 					++index;
 					++recordNo;
 				}
+				
 				++pageNo;
 			}
+			System.out.println(search(temp));
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -92,28 +101,34 @@ public class BPlusTree {
 		System.out.println("Time Taken (milliseconds): " + (endTime - startTime));
 	}
 
-	private int binarySearch(DictionaryPair[] dps, int numPairs, int t) {
+	private int binarySearch(DictionaryPair[] dps, int numPairs, long birthDateLong) {
 		Comparator<DictionaryPair> c = new Comparator<DictionaryPair>() {
 			@Override
 			public int compare(DictionaryPair o1, DictionaryPair o2) {
-				Integer a = Integer.valueOf(o1.key);
-				Integer b = Integer.valueOf(o2.key);
-				return a.compareTo(b);
+				long a = o1.getKey();
+				long b = o1.getKey();
+				if(a < b)
+					return -1;
+				else if(a == b)
+					return 0;
+				else if(a > b)
+					return 1;
+				return 0;
 			}
 		};
-		return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(t, null), c);
+		return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(birthDateLong, null), c);
 	}
 
-	public Date search(int key) {
+	public String search(long birthDateLong) {
 
 		if (isEmpty()) {
 			return null;
 		}
 
-		LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(key);
+		LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(birthDateLong);
 
 		DictionaryPair[] dps = ln.dictionary;
-		int index = binarySearch(dps, ln.numPairs, key);
+		int index = binarySearch(dps, ln.numPairs, birthDateLong);
 
 		if (index < 0) {
 			return null;
@@ -127,12 +142,12 @@ public class BPlusTree {
 	}
 
 	public class DictionaryPair implements Comparable<DictionaryPair> {
-		int key;
-		Date value;
+		long key;
+		String value;
 
-		public DictionaryPair(int key, Date value) {
-			this.key = key;
-			this.value = value;
+		public DictionaryPair(long birthDateLong, String value2) {
+			this.key = birthDateLong;
+			this.value = value2;
 		}
 
 		public int compareTo(DictionaryPair o) {
@@ -143,6 +158,11 @@ public class BPlusTree {
 			} else {
 				return -1;
 			}
+		}
+		
+		public long getKey()
+		{
+			return this.key;
 		}
 	}
 
@@ -195,45 +215,12 @@ public class BPlusTree {
 			this.degree++;
 		}
 
-		private boolean isDeficient() {
-			return this.degree < this.minDegree;
-		}
-
-		private boolean isLendable() {
-			return this.degree > this.minDegree;
-		}
-
-		private boolean isMergeable() {
-			return this.degree == this.minDegree;
-		}
-
 		private boolean isOverfull() {
 			return this.degree == maxDegree + 1;
 		}
 
-		private void prependChildPointer(Node pointer) {
-			for (int i = degree - 1; i >= 0; i--) {
-				childPointers[i + 1] = childPointers[i];
-			}
-			this.childPointers[0] = pointer;
-			this.degree++;
-		}
-
-		private void removeKey(int index) {
-			this.keys[index] = null;
-		}
-
 		private void removePointer(int index) {
 			this.childPointers[index] = null;
-			this.degree--;
-		}
-
-		private void removePointer(Node pointer) {
-			for (int i = 0; i < childPointers.length; i++) {
-				if (childPointers[i] == pointer) {
-					this.childPointers[i] = null;
-				}
-			}
 			this.degree--;
 		}
 
@@ -316,13 +303,13 @@ public class BPlusTree {
 		}
 	}
 
-	private LeafNode findLeafNode(InternalNode node, int key) {
+	private LeafNode findLeafNode(InternalNode node, long birthDateLong) {
 
 		Integer[] keys = node.keys;
 		int i;
 
 		for (i = 0; i < node.degree - 1; i++) {
-			if (key < keys[i]) {
+			if (birthDateLong < keys[i]) {
 				break;
 			}
 		}
@@ -330,17 +317,17 @@ public class BPlusTree {
 		if (childNode instanceof LeafNode) {
 			return (LeafNode) childNode;
 		} else {
-			return findLeafNode((InternalNode) node.childPointers[i], key);
+			return findLeafNode((InternalNode) node.childPointers[i], birthDateLong);
 		}
 	}
 
-	private LeafNode findLeafNode(int key) {
+	private LeafNode findLeafNode(long birthDateLong) {
 
 		Integer[] keys = this.root.keys;
 		int i;
 
 		for (i = 0; i < this.root.degree - 1; i++) {
-			if (key < keys[i]) {
+			if (birthDateLong < keys[i]) {
 				break;
 			}
 		}
@@ -349,7 +336,7 @@ public class BPlusTree {
 		if (child instanceof LeafNode) {
 			return (LeafNode) child;
 		} else {
-			return findLeafNode((InternalNode) child, key);
+			return findLeafNode((InternalNode) child, birthDateLong);
 		}
 	}
 
@@ -464,19 +451,19 @@ public class BPlusTree {
 		}
 	}
 
-	public void insert(int key, Date value) {
+	public void insert(long birthDateLong, String value) {
 		if (isEmpty()) {
 
-			LeafNode ln = new LeafNode(this.m, new DictionaryPair(key, value));
+			LeafNode ln = new LeafNode(this.m, new DictionaryPair(birthDateLong, value));
 
 			this.firstLeaf = ln;
 
 		} else {
-			LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(key);
+			LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(birthDateLong);
 
-			if (!ln.insert(new DictionaryPair(key, value))) {
+			if (!ln.insert(new DictionaryPair(birthDateLong, value))) {
 
-				ln.dictionary[ln.numPairs] = new DictionaryPair(key, value);
+				ln.dictionary[ln.numPairs] = new DictionaryPair(birthDateLong, value);
 				ln.numPairs++;
 				sortDictionary(ln.dictionary);
 
@@ -486,13 +473,13 @@ public class BPlusTree {
 				if (ln.parent == null) {
 
 					Integer[] parent_keys = new Integer[this.m];
-					parent_keys[0] = halfDict[0].key;
+					parent_keys[0] = (int) halfDict[0].key;
 					InternalNode parent = new InternalNode(this.m, parent_keys);
 					ln.parent = parent;
 					parent.appendChildPointer(ln);
 
 				} else {
-					int newParentKey = halfDict[0].key;
+					int newParentKey = (int) halfDict[0].key;
 					ln.parent.keys[ln.parent.degree - 1] = newParentKey;
 					Arrays.sort(ln.parent.keys, 0, ln.parent.degree);
 				}
