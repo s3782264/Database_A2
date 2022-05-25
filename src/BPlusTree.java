@@ -4,53 +4,47 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.*;
 
 public class BPlusTree {
-	private BufferedReader reader;
 	private long startTime;
 	private long endTime;
 	private int pageNo, recordNo, height;
 	private LeafNode firstLeaf;
 	private int m;
 	private InternalNode root;
-	private int hieght;
-	private int index;
 	long temp;
 
 	public BPlusTree() {
 
 	}
 
-	public void run(int pageSize, String file) throws FileNotFoundException {
+	public void run(int pageSize, String file) throws FileNotFoundException, ParseException {
 		// Open the heap file for reading
 		int numBytesInOneRecord = constants.TOTAL_SIZE;
 		int numRecordsPerPage = pageSize / numBytesInOneRecord;
+		int totalNumberOfBytes = 0;
 		byte[] page = new byte[pageSize];
 		FileInputStream inStream = new FileInputStream(file);
 		int numBytesRead = 0;
 		byte[] personNameBytes = new byte[constants.PERSON_NAME_SIZE];
 		byte[] birthDateBytes = new byte[constants.BIRTH_DATE_SIZE];
-		byte[] birthPlaceBytes = new byte[constants.BIRTH_PLACE_SIZE];
-		byte[] deathDateBytes = new byte[constants.DEATH_DATE_SIZE];
-		byte[] fieldBytes = new byte[constants.FIELD_SIZE];
-		byte[] genreBytes = new byte[constants.GENRE_SIZE];
-		byte[] instrumentBytes = new byte[constants.INSTRUMENT_SIZE];
-		byte[] nationalityBytes = new byte[constants.NATIONALITY_SIZE];
-		byte[] thumbnailBytes = new byte[constants.THUMBNAIL_SIZE];
-		byte[] wikipageIdBytes = new byte[constants.WIKIPAGE_ID_SIZE];
-		byte[] descriptionBytes = new byte[constants.DESCRIPTION_SIZE];
 		// Set the start time
 		startTime = System.currentTimeMillis();
 		pageNo = 0;
-		index = 0;
 		this.m = 3;
 		this.root = null;
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+		Date test = dateFormat.parse("1818-03-11 00:00:00");
+		long testLong = test.getTime();
 		try {
 			// Iterate through the lines in the file
 			while ((numBytesRead = inStream.read(page)) != -1) {
 				// Process each record in page
+				totalNumberOfBytes += numBytesRead;
 				for (int i = 0; i < numRecordsPerPage; i++) {
 
 					// Copy record's person name and birth date
@@ -72,26 +66,24 @@ public class BPlusTree {
 						// skip NULL birth dates
 						continue;
 					}
-					Date birthDate = new Date(birthDateLong);
-		
+//					Date birthDate = new Date(birthDateLong);
 					String name = new String(personNameBytes).trim();
-					
-					int indexKey = (int) birthDateLong;
-					Date date1 = new Date(indexKey);
+					long position = inStream.getChannel().position();
+//					System.out.println(birthDateLong);
+//					System.out.println(testLong);
 					insert(birthDateLong, name);
-					
-					temp = birthDateLong;
-					++index;
+//					System.out.println(search(testLong));
 					++recordNo;
+//					System.out.println(birthDateLong);
+
 				}
-				
 				++pageNo;
 			}
-			System.out.println(search(temp));
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
+		System.out.println(search(testLong));
 		// Set the end time
 		endTime = System.currentTimeMillis();
 		// Print info to the console
@@ -101,34 +93,31 @@ public class BPlusTree {
 		System.out.println("Time Taken (milliseconds): " + (endTime - startTime));
 	}
 
-	private int binarySearch(DictionaryPair[] dps, int numPairs, long birthDateLong) {
-		Comparator<DictionaryPair> c = new Comparator<DictionaryPair>() {
-			@Override
-			public int compare(DictionaryPair o1, DictionaryPair o2) {
-				long a = o1.getKey();
-				long b = o1.getKey();
-				if(a < b)
-					return -1;
-				else if(a == b)
-					return 0;
-				else if(a > b)
-					return 1;
-				return 0;
-			}
-		};
-		return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(birthDateLong, null), c);
-	}
+	private int binarySearch(DictionaryPair[] dps, int numPairs, long t) {
+ 	    Comparator<DictionaryPair> c = new Comparator<DictionaryPair>() {
+	      @Override
+	      public int compare(DictionaryPair o1, DictionaryPair o2) {
+	        Long a = o1.key;
+	        Long b = o2.key;
+	        System.out.println(a);
+	        System.out.println(b);
+	        System.out.println(a.compareTo(b));
+	        return a.compareTo(b);
+	      }
+	    };
+	    return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(t, null), c);
+	  }
 
-	public String search(long birthDateLong) {
+	public String search(long key) {
 
 		if (isEmpty()) {
 			return null;
 		}
 
-		LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(birthDateLong);
+		LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(key);
 
 		DictionaryPair[] dps = ln.dictionary;
-		int index = binarySearch(dps, ln.numPairs, birthDateLong);
+		int index = binarySearch(dps, ln.numPairs, key);
 
 		if (index < 0) {
 			return null;
@@ -145,9 +134,9 @@ public class BPlusTree {
 		long key;
 		String value;
 
-		public DictionaryPair(long birthDateLong, String value2) {
+		public DictionaryPair(long birthDateLong, String position) {
 			this.key = birthDateLong;
-			this.value = value2;
+			this.value = position;
 		}
 
 		public int compareTo(DictionaryPair o) {
@@ -159,9 +148,8 @@ public class BPlusTree {
 				return -1;
 			}
 		}
-		
-		public long getKey()
-		{
+
+		public long getKey() {
 			return this.key;
 		}
 	}
@@ -451,19 +439,19 @@ public class BPlusTree {
 		}
 	}
 
-	public void insert(long birthDateLong, String value) {
+	public void insert(long birthDateLong, String position) {
 		if (isEmpty()) {
 
-			LeafNode ln = new LeafNode(this.m, new DictionaryPair(birthDateLong, value));
+			LeafNode ln = new LeafNode(this.m, new DictionaryPair(birthDateLong, position));
 
 			this.firstLeaf = ln;
 
 		} else {
 			LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(birthDateLong);
 
-			if (!ln.insert(new DictionaryPair(birthDateLong, value))) {
+			if (!ln.insert(new DictionaryPair(birthDateLong, position))) {
 
-				ln.dictionary[ln.numPairs] = new DictionaryPair(birthDateLong, value);
+				ln.dictionary[ln.numPairs] = new DictionaryPair(birthDateLong, position);
 				ln.numPairs++;
 				sortDictionary(ln.dictionary);
 
