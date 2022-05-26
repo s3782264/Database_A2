@@ -1,11 +1,10 @@
-import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.*;
 
@@ -16,7 +15,7 @@ public class BPlusTree {
 	private LeafNode firstLeaf;
 	private int m;
 	private InternalNode root;
-	long temp;
+	private FileWriter writer;
 
 	public BPlusTree() {
 
@@ -24,33 +23,36 @@ public class BPlusTree {
 
 	public void run(int pageSize, String file) throws FileNotFoundException, ParseException {
 		// Open the heap file for reading
-		int numBytesInOneRecord = constants.TOTAL_SIZE;
-		int numRecordsPerPage = pageSize / numBytesInOneRecord;
-		int totalNumberOfBytes = 0;
+		int numOfBytesRecord = constants.TOTAL_SIZE;
+		int numOfRecordsPage = pageSize / numOfBytesRecord;
+		int positionInFile = 0;
+		height = 0;
 		byte[] page = new byte[pageSize];
 		FileInputStream inStream = new FileInputStream(file);
 		int numBytesRead = 0;
 		byte[] personNameBytes = new byte[constants.PERSON_NAME_SIZE];
 		byte[] birthDateBytes = new byte[constants.BIRTH_DATE_SIZE];
+		String outFileName = "index." + pageSize;
+		try {
+			writer = new FileWriter(new File(outFileName));
+		} catch (IOException e3) {
+			// TODO Auto-generated catch block
+			e3.printStackTrace();
+		}
 		// Set the start time
 		startTime = System.currentTimeMillis();
 		pageNo = 0;
 		this.m = 3;
 		this.root = null;
-		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-		Date test = dateFormat.parse("1818-03-11 00:00:00");
-		long testLong = test.getTime();
 		try {
 			// Iterate through the lines in the file
 			while ((numBytesRead = inStream.read(page)) != -1) {
 				// Process each record in page
-				totalNumberOfBytes += numBytesRead;
-				for (int i = 0; i < numRecordsPerPage; i++) {
-
+				for (int i = 0; i < numOfRecordsPage; i++) {
 					// Copy record's person name and birth date
-					System.arraycopy(page, ((i * numBytesInOneRecord) + constants.PERSON_NAME_OFFSET), personNameBytes,
-							0, constants.PERSON_NAME_SIZE);
-					System.arraycopy(page, ((i * numBytesInOneRecord) + constants.BIRTH_DATE_OFFSET), birthDateBytes, 0,
+					System.arraycopy(page, ((i * numOfBytesRecord) + constants.PERSON_NAME_OFFSET), personNameBytes, 0,
+							constants.PERSON_NAME_SIZE);
+					System.arraycopy(page, ((i * numOfBytesRecord) + constants.BIRTH_DATE_OFFSET), birthDateBytes, 0,
 							constants.BIRTH_DATE_SIZE);
 
 					// Check if person name field is empty; if so, end of all records found (packed
@@ -66,52 +68,75 @@ public class BPlusTree {
 						// skip NULL birth dates
 						continue;
 					}
-//					Date birthDate = new Date(birthDateLong);
-					String name = new String(personNameBytes).trim();
-					long position = inStream.getChannel().position();
-//					System.out.println(birthDateLong);
-//					System.out.println(testLong);
-					insert(birthDateLong, name);
-//					System.out.println(search(testLong));
-					++recordNo;
-//					System.out.println(birthDateLong);
+					// convert birthDateLong to int
+					int birthDate = (int) birthDateLong;
+					// insert birthdate with file position into the tree
+					insert(birthDate, positionInFile);
 
+					String line = birthDate + "," + positionInFile;
+					writer.write(line);
+					writer.write("\n");
+
+					++recordNo;
 				}
+				// Update the file position
+				positionInFile += pageSize;
 				++pageNo;
 			}
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		System.out.println(search(testLong));
+		try {
+			FileInputStream stream = new FileInputStream(file);
+			stream.skip(0);
+			stream.read(page);
+			for (int i = 0; i < numOfRecordsPage; i++) {
+				System.arraycopy(page, ((i * numOfBytesRecord) + constants.PERSON_NAME_OFFSET), personNameBytes, 0,
+						constants.PERSON_NAME_SIZE);
+				System.arraycopy(page, ((i * numOfBytesRecord) + constants.BIRTH_DATE_OFFSET), birthDateBytes, 0,
+						constants.BIRTH_DATE_SIZE);
+				long birthDateLong = ByteBuffer.wrap(birthDateBytes).getLong();
+				Date birthDate = new Date(birthDateLong);
+				String name = new String(personNameBytes).trim();
+				System.out.println(birthDate + " " + name);
+			}
+
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			writer.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		// Set the end time
 		endTime = System.currentTimeMillis();
 		// Print info to the console
 		System.out.println("Records Indexed: " + recordNo);
 		System.out.println("Page Count: " + pageNo);
-		System.out.println("Tree Height: ");
+		System.out.println("Tree Height: " + height);
 		System.out.println("Time Taken (milliseconds): " + (endTime - startTime));
 	}
 
-	private int binarySearch(DictionaryPair[] dps, int numPairs, long t) {
- 	    Comparator<DictionaryPair> c = new Comparator<DictionaryPair>() {
-	      @Override
-	      public int compare(DictionaryPair o1, DictionaryPair o2) {
-	        Long a = o1.key;
-	        Long b = o2.key;
-	        System.out.println(a);
-	        System.out.println(b);
-	        System.out.println(a.compareTo(b));
-	        return a.compareTo(b);
-	      }
-	    };
-	    return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(t, null), c);
-	  }
+	private int binarySearch(DictionaryPair[] dps, int numPairs, int t) {
+		Comparator<DictionaryPair> c = new Comparator<DictionaryPair>() {
+			@Override
+			public int compare(DictionaryPair o1, DictionaryPair o2) {
+				Integer a = Integer.valueOf(o1.key);
+				Integer b = Integer.valueOf(o2.key);
+				return a.compareTo(b);
+			}
+		};
+		return Arrays.binarySearch(dps, 0, numPairs, new DictionaryPair(t, 0));
+	}
 
-	public String search(long key) {
+	public int search(int key) {
 
 		if (isEmpty()) {
-			return null;
+			return -1;
 		}
 
 		LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(key);
@@ -120,7 +145,7 @@ public class BPlusTree {
 		int index = binarySearch(dps, ln.numPairs, key);
 
 		if (index < 0) {
-			return null;
+			return -1;
 		} else {
 			return dps[index].value;
 		}
@@ -131,12 +156,12 @@ public class BPlusTree {
 	}
 
 	public class DictionaryPair implements Comparable<DictionaryPair> {
-		long key;
-		String value;
+		int key;
+		int value;
 
-		public DictionaryPair(long birthDateLong, String position) {
-			this.key = birthDateLong;
-			this.value = position;
+		public DictionaryPair(int key, int positionInFile) {
+			this.key = key;
+			this.value = positionInFile;
 		}
 
 		public int compareTo(DictionaryPair o) {
@@ -149,7 +174,7 @@ public class BPlusTree {
 			}
 		}
 
-		public long getKey() {
+		public int getKey() {
 			return this.key;
 		}
 	}
@@ -218,6 +243,7 @@ public class BPlusTree {
 			this.degree = 0;
 			this.keys = keys;
 			this.childPointers = new Node[this.maxDegree + 1];
+			height += 1;
 		}
 
 		private InternalNode(int m, Integer[] keys, Node[] pointers) {
@@ -226,6 +252,7 @@ public class BPlusTree {
 			this.degree = linearNullSearch(pointers);
 			this.keys = keys;
 			this.childPointers = pointers;
+			height += 1;
 		}
 	}
 
@@ -280,6 +307,7 @@ public class BPlusTree {
 			this.dictionary = new DictionaryPair[m];
 			this.numPairs = 0;
 			this.insert(dp);
+			height += 1;
 		}
 
 		public LeafNode(int m, DictionaryPair[] dps, InternalNode parent) {
@@ -288,16 +316,17 @@ public class BPlusTree {
 			this.dictionary = dps;
 			this.numPairs = linearNullSearch(dps);
 			this.parent = parent;
+			height += 1;
 		}
 	}
 
-	private LeafNode findLeafNode(InternalNode node, long birthDateLong) {
+	private LeafNode findLeafNode(InternalNode node, int key) {
 
 		Integer[] keys = node.keys;
 		int i;
 
 		for (i = 0; i < node.degree - 1; i++) {
-			if (birthDateLong < keys[i]) {
+			if (key < keys[i]) {
 				break;
 			}
 		}
@@ -305,11 +334,11 @@ public class BPlusTree {
 		if (childNode instanceof LeafNode) {
 			return (LeafNode) childNode;
 		} else {
-			return findLeafNode((InternalNode) node.childPointers[i], birthDateLong);
+			return findLeafNode((InternalNode) node.childPointers[i], key);
 		}
 	}
 
-	private LeafNode findLeafNode(long birthDateLong) {
+	private LeafNode findLeafNode(int birthDateLong) {
 
 		Integer[] keys = this.root.keys;
 		int i;
@@ -439,19 +468,19 @@ public class BPlusTree {
 		}
 	}
 
-	public void insert(long birthDateLong, String position) {
+	public void insert(int birthDateLong, int positionInFile) {
 		if (isEmpty()) {
 
-			LeafNode ln = new LeafNode(this.m, new DictionaryPair(birthDateLong, position));
+			LeafNode ln = new LeafNode(this.m, new DictionaryPair(birthDateLong, positionInFile));
 
 			this.firstLeaf = ln;
 
 		} else {
 			LeafNode ln = (this.root == null) ? this.firstLeaf : findLeafNode(birthDateLong);
 
-			if (!ln.insert(new DictionaryPair(birthDateLong, position))) {
+			if (!ln.insert(new DictionaryPair(birthDateLong, positionInFile))) {
 
-				ln.dictionary[ln.numPairs] = new DictionaryPair(birthDateLong, position);
+				ln.dictionary[ln.numPairs] = new DictionaryPair(birthDateLong, positionInFile);
 				ln.numPairs++;
 				sortDictionary(ln.dictionary);
 
@@ -461,13 +490,13 @@ public class BPlusTree {
 				if (ln.parent == null) {
 
 					Integer[] parent_keys = new Integer[this.m];
-					parent_keys[0] = (int) halfDict[0].key;
+					parent_keys[0] = halfDict[0].key;
 					InternalNode parent = new InternalNode(this.m, parent_keys);
 					ln.parent = parent;
 					parent.appendChildPointer(ln);
 
 				} else {
-					int newParentKey = (int) halfDict[0].key;
+					int newParentKey = halfDict[0].key;
 					ln.parent.keys[ln.parent.degree - 1] = newParentKey;
 					Arrays.sort(ln.parent.keys, 0, ln.parent.degree);
 				}
